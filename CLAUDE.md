@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Verification
 - Run Rust verification from `rust/`: `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`
+- Jianying draft helper: `cargo run -p jianying-auto -- --media <clips> --script <text>` (see `rust/crates/jianying-auto/README.md`)
 - `src/` and `tests/` are both present; update both surfaces together when behavior changes.
 
 ## Repository shape
