@@ -22,12 +22,14 @@ impl Date {
         Some(Self { year, month, day })
     }
 
+    /// A-share calendar date in Beijing time (UTC+8).
     #[must_use]
     pub fn today() -> Self {
         let secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
-            .unwrap_or(0);
+            .unwrap_or(0)
+            .saturating_add(8 * 3600);
         civil_from_days((i64::try_from(secs / 86_400).unwrap_or(0)) as i32)
     }
 

@@ -1,6 +1,6 @@
-use crate::client::{fetch_window, Transport};
+use crate::client::{fetch_window, sanitize_code, Transport};
 use crate::date::Date;
-use crate::model::{parse_event, rank_events, UnlockEvent};
+use crate::model::{parse_daily, parse_event, rank_events, UnlockEvent};
 use crate::report::render_markdown;
 use crate::write_reports;
 use serde_json::{json, Value};
@@ -90,6 +90,7 @@ fn fetch_window_reads_scripted_pages() {
         start,
         start.add_days(30),
         std::time::Duration::from_millis(0),
+        None,
     )
     .unwrap();
     assert_eq!(events.len(), 1);
@@ -103,15 +104,18 @@ fn writes_obsidian_style_index() {
     let rows = rank_events(vec![event], today, 0.0, 10);
     let dir = std::env::temp_dir().join("jiejin-watch-test");
     let _ = std::fs::remove_dir_all(&dir);
-    let result = write_reports(today, today, today.add_days(60), 1.0, &dir, &rows).unwrap();
+    let result =
+        write_reports(today, today, today.add_days(60), 1.0, 14, &dir, &rows, &[]).unwrap();
     assert!(result
         .markdown_path
         .ends_with("20260908-大额解禁Top1图谱索引_1只.md"));
     let md = std::fs::read_to_string(&result.markdown_path).unwrap();
     assert!(md.contains("天海防务"));
     assert!(md.contains("data.eastmoney.com/dxf/q/300008.html"));
-    let rendered = render_markdown(today, today, today.add_days(60), 1.0, &rows);
+    assert!(md.contains("解禁临近"));
+    let rendered = render_markdown(today, today, today.add_days(60), 1.0, 14, &rows, &[]);
     assert!(rendered.contains("解禁期前"));
+    assert!(rendered.contains("解禁临近"));
 }
 
 #[test]
@@ -131,4 +135,23 @@ fn past_unlocks_are_dropped() {
     };
     let today = Date::new(2026, 9, 11).unwrap();
     assert!(rank_events(vec![past], today, 0.0, 10).is_empty());
+}
+
+#[test]
+fn sanitize_stock_code() {
+    assert_eq!(sanitize_code("sz300008").as_deref(), Some("300008"));
+    assert_eq!(sanitize_code("abc"), None);
+}
+
+#[test]
+fn parse_daily_calendar_row() {
+    let day = parse_daily(&json!({
+        "FREE_DATE": "2026-09-14 00:00:00",
+        "LIFT_ORG_NUM": 12,
+        "LIFT_NUM": 232_502.14,
+        "MARKET_CAP": 3_129_502.51
+    }))
+    .unwrap();
+    assert_eq!(day.org_num, 12);
+    assert!((day.lift_yi() - 312.950_251).abs() < 0.001);
 }

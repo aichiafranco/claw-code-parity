@@ -41,6 +41,18 @@ struct Cli {
     #[arg(long, default_value_t = false)]
     holders: bool,
 
+    /// 不写全市场按日解禁日历
+    #[arg(long, default_value_t = false)]
+    no_calendar: bool,
+
+    /// 只看某一只股票（6 位代码，可带 sh/sz 后缀）
+    #[arg(long)]
+    code: Option<String>,
+
+    /// 「解禁临近」窗口天数
+    #[arg(long, default_value_t = 7)]
+    near: u32,
+
     /// 分页间隔毫秒，避免打太勤
     #[arg(long, default_value_t = 200)]
     pause_ms: u64,
@@ -67,17 +79,30 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             days: cli.days,
             top: cli.top,
             min_yi: cli.min_yi,
+            near_days: cli.near,
+            code: cli.code,
             holders: cli.holders,
+            calendar: !cli.no_calendar,
             pause_ms: cli.pause_ms,
             output_dir: cli.output,
         },
     )?;
     println!(
-        "已生成解禁期前 Top{} 索引：{}\n  窗口 {} ～ {}\n  JSON {}",
+        "已生成解禁期前 Top{} 索引：{}\n  窗口 {} ～ {}\n  临近 {} 天内 {} 只 · 日历 {} 天\n  JSON {}",
         result.rows.len(),
         result.markdown_path.display(),
         result.start,
         result.end,
+        cli.near,
+        result
+            .rows
+            .iter()
+            .filter(|row| {
+                row.days_ahead >= 0
+                    && row.days_ahead <= i32::try_from(cli.near).unwrap_or(i32::MAX)
+            })
+            .count(),
+        result.calendar.len(),
         result.json_path.display()
     );
     Ok(())

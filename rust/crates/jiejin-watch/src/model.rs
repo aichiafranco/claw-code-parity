@@ -103,6 +103,23 @@ pub struct RankedUnlock {
     pub holders: Vec<Holder>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DailyLift {
+    pub date: String,
+    pub org_num: u32,
+    /// 解禁数量（万股）
+    pub lift_num_wan: f64,
+    /// 解禁市值（万元）
+    pub market_cap_wan: f64,
+}
+
+impl DailyLift {
+    #[must_use]
+    pub fn lift_yi(&self) -> f64 {
+        self.market_cap_wan / 10_000.0
+    }
+}
+
 pub fn parse_event(row: &serde_json::Value) -> Option<UnlockEvent> {
     let code = row.get("SECURITY_CODE")?.as_str()?.to_string();
     let name = row
@@ -153,6 +170,18 @@ pub fn parse_holder(row: &serde_json::Value) -> Option<Holder> {
 
 fn as_f64(value: &serde_json::Value) -> Option<f64> {
     value.as_f64().or_else(|| value.as_i64().map(|n| n as f64))
+}
+
+pub fn parse_daily(row: &serde_json::Value) -> Option<DailyLift> {
+    Some(DailyLift {
+        date: row.get("FREE_DATE")?.as_str()?.to_string(),
+        org_num: row
+            .get("LIFT_ORG_NUM")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as u32,
+        lift_num_wan: json_f64(row.get("LIFT_NUM")),
+        market_cap_wan: json_f64(row.get("MARKET_CAP")),
+    })
 }
 
 fn json_f64(value: Option<&serde_json::Value>) -> f64 {

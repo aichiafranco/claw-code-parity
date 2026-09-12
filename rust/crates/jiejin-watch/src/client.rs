@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::date::Date;
-use crate::model::{parse_event, parse_holder, Holder, UnlockEvent};
+use crate::model::{parse_daily, parse_event, parse_holder, DailyLift, Holder, UnlockEvent};
 
 pub const DATACENTER: &str = "https://datacenter-web.eastmoney.com/api/data/v1/get";
 const LIFT_STAGE_COLUMNS: &str = "SECURITY_CODE,SECURITY_NAME_ABBR,FREE_DATE,CURRENT_FREE_SHARES,\
@@ -74,6 +74,7 @@ pub fn fetch_window<T: Transport>(
     start: Date,
     end: Date,
     pause: Duration,
+    code: Option<&str>,
 ) -> Result<Vec<UnlockEvent>, FetchError> {
     let mut page = 1_u32;
     let mut events = Vec::new();
@@ -88,10 +89,7 @@ pub fn fetch_window<T: Transport>(
             ("columns", LIFT_STAGE_COLUMNS.into()),
             ("source", "WEB".into()),
             ("client", "WEB".into()),
-            (
-                "filter",
-                format!("(FREE_DATE>='{start}')(FREE_DATE<='{end}')"),
-            ),
+            ("filter", window_filter(start, end, code)),
         ])?;
         if body.get("success") != Some(&Value::Bool(true)) {
             return Err(FetchError::Upstream(
@@ -124,6 +122,79 @@ pub fn fetch_window<T: Transport>(
     Ok(events)
 }
 
+fn window_filter(start: Date, end: Date, code: Option<&str>) -> String {
+    let mut filter = format!("(FREE_DATE>='{start}')(FREE_DATE<='{end}')");
+    if let Some(code) = code.and_then(sanitize_code) {
+        filter = format!("(SECURITY_CODE=\"{code}\"){filter}");
+    }
+    filter
+}
+
+#[must_use]
+pub fn sanitize_code(code: &str) -> Option<String> {
+    let digits: String = code.chars().filter(char::is_ascii_digit).take(6).collect();
+    if digits.len() == 6 {
+        Some(digits)
+    } else {
+        None
+    }
+}
+
+pub fn fetch_calendar<T: Transport>(
+    transport: &T,
+    start: Date,
+    end: Date,
+    pause: Duration,
+) -> Result<Vec<DailyLift>, FetchError> {
+    let mut page = 1_u32;
+    let mut days = Vec::new();
+    let mut pages = 1_u32;
+    while page <= pages {
+        let body = transport.get_json(&[
+            ("sortColumns", "FREE_DATE".into()),
+            ("sortTypes", "1".into()),
+            ("pageSize", "500".into()),
+            ("pageNumber", page.to_string()),
+            ("reportName", "RPT_LIFTDAY_STA".into()),
+            ("columns", "ALL".into()),
+            ("source", "WEB".into()),
+            ("client", "WEB".into()),
+            (
+                "filter",
+                format!("(INDEX_CODE=\"000300\")(FREE_DATE>='{start}')(FREE_DATE<='{end}')"),
+            ),
+        ])?;
+        if body.get("success") != Some(&Value::Bool(true)) {
+            return Err(FetchError::Upstream(
+                body.get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("eastmoney calendar request failed")
+                    .to_string(),
+            ));
+        }
+        let result = body
+            .get("result")
+            .ok_or_else(|| FetchError::Upstream("missing result".into()))?;
+        pages = result
+            .get("pages")
+            .and_then(Value::as_u64)
+            .unwrap_or(1)
+            .max(1) as u32;
+        if let Some(rows) = result.get("data").and_then(Value::as_array) {
+            for row in rows {
+                if let Some(day) = parse_daily(row) {
+                    days.push(day);
+                }
+            }
+        }
+        page += 1;
+        if page <= pages {
+            thread::sleep(pause);
+        }
+    }
+    Ok(days)
+}
+
 pub fn fetch_holders<T: Transport>(
     transport: &T,
     code: &str,
@@ -140,7 +211,10 @@ pub fn fetch_holders<T: Transport>(
         ("client", "WEB".into()),
         (
             "filter",
-            format!("(SECURITY_CODE=\"{code}\")(FREE_DATE='{free_date}')"),
+            format!(
+                "(SECURITY_CODE=\"{}\")(FREE_DATE='{free_date}')",
+                sanitize_code(code).unwrap_or_else(|| code.to_string())
+            ),
         ),
     ])?;
     if body.get("success") != Some(&Value::Bool(true)) {

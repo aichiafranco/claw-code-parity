@@ -14,9 +14,9 @@ pub mod report;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::client::{fetch_holders, fetch_window, FetchError, Transport};
+use crate::client::{fetch_calendar, fetch_holders, fetch_window, FetchError, Transport};
 use crate::date::Date;
-use crate::model::{rank_events, RankedUnlock};
+use crate::model::{rank_events, DailyLift, RankedUnlock};
 use crate::report::{render_json, render_markdown};
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,10 @@ pub struct WatchConfig {
     pub days: u32,
     pub top: usize,
     pub min_yi: f64,
+    pub near_days: u32,
+    pub code: Option<String>,
     pub holders: bool,
+    pub calendar: bool,
     pub pause_ms: u64,
     pub output_dir: PathBuf,
 }
@@ -35,6 +38,7 @@ pub struct WatchResult {
     pub start: Date,
     pub end: Date,
     pub rows: Vec<RankedUnlock>,
+    pub calendar: Vec<DailyLift>,
     pub markdown_path: PathBuf,
     pub json_path: PathBuf,
 }
@@ -89,6 +93,7 @@ pub fn run_watch<T: Transport>(
         start,
         end,
         Duration::from_millis(config.pause_ms),
+        config.code.as_deref(),
     )?;
     let mut rows = rank_events(events, config.as_of, config.min_yi, config.top);
     if config.holders {
@@ -99,23 +104,39 @@ pub fn run_watch<T: Transport>(
             }
         }
     }
+    let calendar = if config.calendar {
+        fetch_calendar(
+            transport,
+            start,
+            end,
+            Duration::from_millis(config.pause_ms),
+        )
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     write_reports(
         config.as_of,
         start,
         end,
         config.min_yi,
+        config.near_days,
         &config.output_dir,
         &rows,
+        &calendar,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn write_reports(
     as_of: Date,
     start: Date,
     end: Date,
     min_yi: f64,
+    near_days: u32,
     output_dir: &Path,
     rows: &[RankedUnlock],
+    calendar: &[DailyLift],
 ) -> Result<WatchResult, WatchError> {
     std::fs::create_dir_all(output_dir)?;
     let stem = format!(
@@ -128,13 +149,14 @@ pub fn write_reports(
     let json_path = output_dir.join(format!("{stem}.json"));
     std::fs::write(
         &markdown_path,
-        render_markdown(as_of, start, end, min_yi, rows),
+        render_markdown(as_of, start, end, min_yi, near_days, rows, calendar),
     )?;
-    std::fs::write(&json_path, render_json(rows)?)?;
+    std::fs::write(&json_path, render_json(rows, calendar)?)?;
     Ok(WatchResult {
         start,
         end,
         rows: rows.to_vec(),
+        calendar: calendar.to_vec(),
         markdown_path,
         json_path,
     })
