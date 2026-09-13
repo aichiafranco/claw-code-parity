@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Verification
 - Run Rust verification from `rust/`: `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`
+- Lockup-expiry helper: `cargo run -p jiejin-watch -- serve` then open http://127.0.0.1:8787/ (see `rust/crates/jiejin-watch/README.md`)
 - `src/` and `tests/` are both present; update both surfaces together when behavior changes.
 
 ## Repository shape

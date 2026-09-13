@@ -137,11 +137,12 @@ rust/
 - **runtime** — `ConversationRuntime` agentic loop, `ConfigLoader` hierarchy, `Session` persistence, permission policy, MCP client, system prompt assembly, usage tracking
 - **rusty-claude-cli** — REPL, one-shot prompt, streaming display, tool call rendering, CLI argument parsing
 - **tools** — Tool specs + execution: Bash, ReadFile, WriteFile, EditFile, GlobSearch, GrepSearch, WebSearch, WebFetch, Agent, TodoWrite, NotebookEdit, Skill, ToolSearch, REPL runtimes
+- **jiejin-watch** — Upcoming A-share lockup expiries (`jiejin-watch serve` opens the local UI)
 
 ## Stats
 
 - **~20K lines** of Rust
-- **6 crates** in workspace
+- **7 crates** in workspace
 - **Binary name:** `claw`
 - **Default model:** `claude-opus-4-6`
 - **Default permissions:** `danger-full-access`
