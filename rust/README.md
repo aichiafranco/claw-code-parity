@@ -137,7 +137,7 @@ rust/
 - **runtime** — `ConversationRuntime` agentic loop, `ConfigLoader` hierarchy, `Session` persistence, permission policy, MCP client, system prompt assembly, usage tracking
 - **rusty-claude-cli** — REPL, one-shot prompt, streaming display, tool call rendering, CLI argument parsing
 - **tools** — Tool specs + execution: Bash, ReadFile, WriteFile, EditFile, GlobSearch, GrepSearch, WebSearch, WebFetch, Agent, TodoWrite, NotebookEdit, Skill, ToolSearch, REPL runtimes
-- **jiejin-watch** — Upcoming A-share lockup expiries (`jiejin-watch --days 60 --top 100`)
+- **jiejin-watch** — Upcoming A-share lockup expiries (`jiejin-watch serve` opens the local UI)
 
 ## Stats
 

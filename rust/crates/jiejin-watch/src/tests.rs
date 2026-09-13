@@ -2,6 +2,7 @@ use crate::client::{fetch_window, sanitize_code, Transport};
 use crate::date::Date;
 use crate::model::{parse_daily, parse_event, rank_events, UnlockEvent};
 use crate::report::render_markdown;
+use crate::web::{build_config, FetchRequest};
 use crate::write_reports;
 use serde_json::{json, Value};
 use std::cell::RefCell;
@@ -154,4 +155,56 @@ fn parse_daily_calendar_row() {
     .unwrap();
     assert_eq!(day.org_num, 12);
     assert!((day.lift_yi() - 312.950_251).abs() < 0.001);
+}
+
+#[test]
+fn web_page_has_controls() {
+    let html = crate::web::index_html();
+    assert!(html.contains("id=\"fetch-form\""));
+    assert!(html.contains("id=\"run-btn\""));
+    assert!(html.contains("/api/fetch"));
+}
+
+#[test]
+fn fetch_request_rejects_bad_days() {
+    let err = build_config(
+        &FetchRequest {
+            days: Some(0),
+            top: None,
+            min_yi: None,
+            near: None,
+            as_of: None,
+            code: None,
+            holders: None,
+            calendar: None,
+            output: None,
+            pause_ms: None,
+        },
+        std::path::Path::new("./jiejin-out"),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("1～365"));
+}
+
+#[test]
+fn fetch_request_accepts_as_of_and_code() {
+    let config = build_config(
+        &FetchRequest {
+            days: Some(30),
+            top: Some(15),
+            min_yi: Some(1.0),
+            near: Some(7),
+            as_of: Some("20260912".into()),
+            code: Some("sz000630".into()),
+            holders: Some(false),
+            calendar: Some(true),
+            output: Some("/tmp/jiejin-ui".into()),
+            pause_ms: Some(0),
+        },
+        std::path::Path::new("./jiejin-out"),
+    )
+    .unwrap();
+    assert_eq!(config.as_of.to_string(), "2026-09-12");
+    assert_eq!(config.code.as_deref(), Some("sz000630"));
+    assert_eq!(config.days, 30);
 }

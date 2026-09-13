@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use jiejin_watch::client::EastmoneyTransport;
 use jiejin_watch::date::Date;
 use jiejin_watch::{run_watch, WatchConfig};
@@ -17,42 +17,54 @@ use jiejin_watch::{run_watch, WatchConfig};
     about = "自动抓取解禁期前的 A 股限售解禁名单（东方财富公开数据）"
 )]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+    #[command(flatten)]
+    fetch: FetchArgs,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// 打开本地前端操作页
+    Serve {
+        /// 监听地址
+        #[arg(long, default_value = "127.0.0.1:8787")]
+        bind: String,
+        /// 页面默认输出目录
+        #[arg(long, default_value = "./jiejin-out")]
+        output: PathBuf,
+    },
+}
+
+#[derive(clap::Args, Debug)]
+struct FetchArgs {
     /// 向后看多少天（解禁期前窗口，含今天）
     #[arg(long, default_value_t = 60)]
     days: u32,
-
     /// 按解禁市值取前 N 名
     #[arg(long, default_value_t = 100)]
     top: usize,
-
     /// 最低解禁市值（亿元），用于筛大额
     #[arg(long, default_value_t = 1.0)]
     min_yi: f64,
-
     /// 输出目录（可指向 Obsidian 库）
     #[arg(long, default_value = "./jiejin-out")]
     output: PathBuf,
-
     /// 基准日，默认今天；格式 YYYY-MM-DD 或 YYYYMMDD
     #[arg(long)]
     as_of: Option<String>,
-
     /// 同时抓取 Top 名单的解禁股东
     #[arg(long, default_value_t = false)]
     holders: bool,
-
     /// 不写全市场按日解禁日历
     #[arg(long, default_value_t = false)]
     no_calendar: bool,
-
     /// 只看某一只股票（6 位代码，可带 sh/sz 后缀）
     #[arg(long)]
     code: Option<String>,
-
     /// 「解禁临近」窗口天数
     #[arg(long, default_value_t = 7)]
     near: u32,
-
     /// 分页间隔毫秒，避免打太勤
     #[arg(long, default_value_t = 200)]
     pause_ms: u64,
@@ -67,7 +79,14 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let as_of = match cli.as_of {
+    match cli.command {
+        Some(Command::Serve { bind, output }) => jiejin_watch::web::serve(&bind, &output),
+        None => fetch(cli.fetch),
+    }
+}
+
+fn fetch(args: FetchArgs) -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = match args.as_of {
         Some(value) => value.parse()?,
         None => Date::today(),
     };
@@ -76,15 +95,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         &transport,
         &WatchConfig {
             as_of,
-            days: cli.days,
-            top: cli.top,
-            min_yi: cli.min_yi,
-            near_days: cli.near,
-            code: cli.code,
-            holders: cli.holders,
-            calendar: !cli.no_calendar,
-            pause_ms: cli.pause_ms,
-            output_dir: cli.output,
+            days: args.days,
+            top: args.top,
+            min_yi: args.min_yi,
+            near_days: args.near,
+            code: args.code,
+            holders: args.holders,
+            calendar: !args.no_calendar,
+            pause_ms: args.pause_ms,
+            output_dir: args.output,
         },
     )?;
     println!(
@@ -93,13 +112,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         result.markdown_path.display(),
         result.start,
         result.end,
-        cli.near,
+        args.near,
         result
             .rows
             .iter()
             .filter(|row| {
                 row.days_ahead >= 0
-                    && row.days_ahead <= i32::try_from(cli.near).unwrap_or(i32::MAX)
+                    && row.days_ahead <= i32::try_from(args.near).unwrap_or(i32::MAX)
             })
             .count(),
         result.calendar.len(),

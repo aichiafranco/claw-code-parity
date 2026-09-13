@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>解禁期前 · 操作台</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --line: #2c3a4a;
+      --text: #e8eef5;
+      --muted: #8aa0b5;
+      --accent: #3ecf8e;
+      --warn: #f0b429;
+      --danger: #f07178;
+      --chip: #243140;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+      background: radial-gradient(1200px 500px at 10% -10%, #1d3b33 0%, var(--bg) 45%);
+      color: var(--text);
+    }
+    header {
+      padding: 28px 24px 8px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 650; }
+    header p { margin: 0; color: var(--muted); }
+    main { max-width: 1200px; margin: 0 auto; padding: 16px 24px 48px; }
+    form {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+    input[type="text"], input[type="number"], input[type="date"] {
+      background: #10171f;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 14px;
+    }
+    .checks { grid-column: span 2; display: flex; align-items: end; gap: 18px; color: var(--text); }
+    .checks label { flex-direction: row; align-items: center; font-size: 14px; }
+    .actions { grid-column: span 2; display: flex; align-items: end; gap: 10px; }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); color: #062016; font-weight: 700; }
+    button.ghost { background: var(--chip); color: var(--text); }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .status { margin: 14px 0; min-height: 24px; color: var(--muted); }
+    .status.error { color: var(--danger); }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+    .kpi b { display: block; font-size: 22px; margin-top: 4px; }
+    section { margin-top: 18px; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    .toolbar { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 14px; overflow: hidden; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    a { color: var(--accent); }
+    .empty { color: var(--muted); padding: 20px; }
+    .near td:first-child { color: var(--warn); font-weight: 700; }
+    @media (max-width: 900px) {
+      form, .kpis { grid-template-columns: 1fr 1fr; }
+      .checks, .actions { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>解禁期前操作台</h1>
+    <p>填写窗口后抓取东方财富公开解禁数据，生成 Obsidian 索引，并在本页查看临近名单与大额 Top。</p>
+  </header>
+  <main>
+    <form id="fetch-form">
+      <label>向后看天数
+        <input id="days" name="days" type="number" min="1" max="365" value="60" />
+      </label>
+      <label>Top N
+        <input id="top" name="top" type="number" min="1" max="500" value="100" />
+      </label>
+      <label>最低解禁市值（亿元）
+        <input id="min_yi" name="min_yi" type="number" min="0" step="0.1" value="1" />
+      </label>
+      <label>临近天数
+        <input id="near" name="near" type="number" min="0" max="365" value="7" />
+      </label>
+      <label>基准日（可空=今天）
+        <input id="as_of" name="as_of" type="text" placeholder="2026-09-13 或 20260913" />
+      </label>
+      <label>股票代码（可空）
+        <input id="code" name="code" type="text" placeholder="如 000630" />
+      </label>
+      <label>输出目录
+        <input id="output" name="output" type="text" placeholder="./jiejin-out" />
+      </label>
+      <label>分页间隔 ms
+        <input id="pause_ms" name="pause_ms" type="number" min="0" max="5000" value="200" />
+      </label>
+      <div class="checks">
+        <label><input id="holders" type="checkbox" /> 抓解禁股东</label>
+        <label><input id="calendar" type="checkbox" checked /> 全市场日历</label>
+      </div>
+      <div class="actions">
+        <button class="primary" id="run-btn" type="submit">开始抓取</button>
+        <button class="ghost" id="download-btn" type="button" disabled>下载 Markdown</button>
+      </div>
+    </form>
+    <div id="status" class="status">尚未抓取。提交后会写入输出目录，并在下面展示结果。</div>
+    <div class="kpis" id="kpis" hidden>
+      <div class="kpi">窗口<b id="kpi-window">-</b></div>
+      <div class="kpi">大额只数<b id="kpi-rows">-</b></div>
+      <div class="kpi">临近只数<b id="kpi-near">-</b></div>
+      <div class="kpi">日历天数<b id="kpi-cal">-</b></div>
+    </div>
+    <section>
+      <h2>解禁临近</h2>
+      <div id="near-table" class="empty">还没有数据</div>
+    </section>
+    <section>
+      <h2>全市场解禁日历</h2>
+      <div id="cal-table" class="empty">还没有数据</div>
+    </section>
+    <section>
+      <div class="toolbar">
+        <h2>大额解禁个股</h2>
+        <input id="filter" type="text" placeholder="筛选代码 / 简称 / 类型" />
+      </div>
+      <div id="rows-table" class="empty">还没有数据</div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let lastMarkdown = "";
+    let lastName = "解禁索引.md";
+    let lastRows = [];
+    let lastNearDays = 7;
+
+    async function loadDefaults() {
+      try {
+        const res = await fetch("/api/defaults");
+        const data = await res.json();
+        $("as_of").placeholder = data.as_of || "";
+        $("output").placeholder = data.output || "./jiejin-out";
+        if (!$("output").value) $("output").value = data.output || "";
+      } catch (_) { /* keep hardcoded defaults */ }
+    }
+
+    function table(headers, rowsHtml, emptyText) {
+      if (!rowsHtml) return `<div class="empty">${emptyText}</div>`;
+      return `<table><thead><tr>${headers}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+    }
+
+    function renderNear(rows, nearDays) {
+      const near = rows.filter((r) => r.days_ahead >= 0 && r.days_ahead <= nearDays);
+      $("kpi-near").textContent = String(near.length);
+      $("near-table").innerHTML = table(
+        "<th class='num'>距今</th><th>代码</th><th>简称</th><th>解禁日</th><th class='num'>市值(亿)</th><th>类型</th>",
+        near.map((r) => `<tr class="near"><td class="num">${r.days_ahead}</td><td>${r.code}</td><td>${r.name}</td><td>${r.free_date}</td><td class="num">${r.lift_yi.toFixed(2)}</td><td>${r.share_type}</td></tr>`).join(""),
+        "窗口内没有临近解禁"
+      );
+    }
+
+    function renderCalendar(days) {
+      $("kpi-cal").textContent = String(days.length);
+      $("cal-table").innerHTML = table(
+        "<th>日期</th><th class='num'>家数</th><th class='num'>解禁市值(亿)</th>",
+        days.map((d) => `<tr><td>${d.date}</td><td class="num">${d.org_num}</td><td class="num">${d.lift_yi.toFixed(2)}</td></tr>`).join(""),
+        "未抓取日历"
+      );
+    }
+
+    function renderRows(rows, query) {
+      const q = (query || "").trim().toLowerCase();
+      const filtered = rows.filter((r) => !q || `${r.code}${r.name}${r.share_type}`.toLowerCase().includes(q));
+      $("rows-table").innerHTML = table(
+        "<th class='num'>#</th><th>代码</th><th>简称</th><th>解禁日</th><th class='num'>距今</th><th class='num'>市值(亿)</th><th class='num'>占流通%</th><th>类型</th><th>链接</th>",
+        filtered.map((r) => `<tr>
+          <td class="num">${r.rank}</td>
+          <td><a href="${r.quote_url}" target="_blank" rel="noreferrer">${r.code}</a></td>
+          <td>${r.name}</td>
+          <td>${r.free_date}</td>
+          <td class="num">${r.days_ahead}</td>
+          <td class="num">${r.lift_yi.toFixed(2)}</td>
+          <td class="num">${r.free_ratio_pct.toFixed(2)}</td>
+          <td>${r.share_type}</td>
+          <td><a href="${r.unlock_url}" target="_blank" rel="noreferrer">解禁</a> · <a href="${r.notice_url}" target="_blank" rel="noreferrer">公告</a> · <a href="${r.news_url}" target="_blank" rel="noreferrer">资讯</a></td>
+        </tr>`).join(""),
+        "没有匹配的个股"
+      );
+    }
+
+    $("filter").addEventListener("input", () => renderRows(lastRows, $("filter").value));
+
+    $("download-btn").addEventListener("click", () => {
+      if (!lastMarkdown) return;
+      const blob = new Blob([lastMarkdown], { type: "text/markdown;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = lastName;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    $("fetch-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const status = $("status");
+      const btn = $("run-btn");
+      btn.disabled = true;
+      status.className = "status";
+      status.textContent = "正在抓取东方财富公开接口…";
+      lastNearDays = Number($("near").value || 7);
+      const payload = {
+        days: Number($("days").value),
+        top: Number($("top").value),
+        min_yi: Number($("min_yi").value),
+        near: lastNearDays,
+        as_of: $("as_of").value.trim(),
+        code: $("code").value.trim(),
+        output: $("output").value.trim(),
+        pause_ms: Number($("pause_ms").value),
+        holders: $("holders").checked,
+        calendar: $("calendar").checked,
+      };
+      try {
+        const res = await fetch("/api/fetch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "抓取失败");
+        lastRows = data.rows || [];
+        lastMarkdown = data.markdown || "";
+        lastName = (data.markdown_path || "解禁索引.md").split(/[\\/]/).pop();
+        $("kpis").hidden = false;
+        $("kpi-window").textContent = `${data.start} ～ ${data.end}`;
+        $("kpi-rows").textContent = String(lastRows.length);
+        renderNear(lastRows, lastNearDays);
+        renderCalendar(data.calendar || []);
+        renderRows(lastRows, $("filter").value);
+        $("download-btn").disabled = !lastMarkdown;
+        status.textContent = `完成。已写入 ${data.markdown_path}`;
+      } catch (err) {
+        status.className = "status error";
+        status.textContent = err.message || String(err);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    loadDefaults();
+  </script>
+</body>
+</html>

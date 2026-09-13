@@ -35,7 +35,7 @@ pub fn render_markdown(
         out.push_str(&format!("## 解禁临近（{near_days} 天内）\n\n"));
         out.push_str("| 距今 | 代码 | 简称 | 解禁日 | 解禁市值(亿) | 类型 |\n| ---: | --- | --- | --- | ---: | --- |\n");
         for row in near {
-            let date = format_date(&row.event.free_date);
+            let date = format_free_date(&row.event.free_date);
             out.push_str(&format!(
                 "| {} | {} | {} | {date} | {:.2} | {} |\n",
                 row.days_ahead,
@@ -54,7 +54,7 @@ pub fn render_markdown(
         for day in calendar {
             out.push_str(&format!(
                 "| {} | {} | {:.2} |\n",
-                format_date(&day.date),
+                format_free_date(&day.date),
                 day.org_num,
                 day.lift_yi()
             ));
@@ -66,7 +66,7 @@ pub fn render_markdown(
     out.push_str("| 排名 | 代码 | 简称 | 解禁日 | 距今(天) | 解禁市值(亿) | 占流通% | 类型 | 解禁页 | 公告 | 资讯 |\n");
     out.push_str("| ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |\n");
     for row in rows {
-        let date = format_date(&row.event.free_date);
+        let date = format_free_date(&row.event.free_date);
         out.push_str(&format!(
             "| {} | {} | {} | {date} | {} | {:.2} | {:.2} | {} | [解禁]({}) | [公告]({}) | [资讯]({}) |\n",
             row.rank,
@@ -91,7 +91,7 @@ pub fn render_markdown(
                 "\n### {} {}（{}）\n",
                 row.event.code,
                 row.event.name,
-                format_date(&row.event.free_date)
+                format_free_date(&row.event.free_date)
             ));
             out.push_str("| 股东 | 解禁股数 | 解禁市值(元) | 锁定期(月) | 类型 |\n| --- | ---: | ---: | ---: | --- |\n");
             for holder in &row.holders {
@@ -112,7 +112,7 @@ pub fn render_markdown(
     out
 }
 
-fn format_date(value: &str) -> String {
+pub(crate) fn format_free_date(value: &str) -> String {
     parse_datetime(value).map_or_else(|| value.to_string(), |d| d.to_string())
 }
 
